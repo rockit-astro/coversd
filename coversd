@@ -1,0 +1,211 @@
+#!/usr/bin/env python3
+#
+# This file is part of the Robotic Observatory Control Kit (rockit)
+#
+# rockit is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# rockit is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with rockit.  If not, see <http://www.gnu.org/licenses/>.
+
+"""Daemon for controlling the W1m mirror cover controller via Pyro"""
+
+import argparse
+import threading
+import time
+import serial
+from astropy.time import Time
+import astropy.units as u
+import Pyro4
+from rockit.common import log, TryLock
+from rockit.common.helpers import pyro_client_matches
+from rockit.covers import CommandStatus, Config, CoversState
+
+RESPONSE_STATUS = {
+    'STOPPED': CoversState.Stopped,
+    'OPEN': CoversState.Open,
+    'CLOSED': CoversState.Closed,
+    'OPENING': CoversState.Opening,
+    'CLOSING': CoversState.Closing
+}
+
+
+class CoversDaemon:
+    """Daemon interface for the W1m mirror covers"""
+    def __init__(self, config):
+        self._config = config
+        self._command_lock = threading.Lock()
+        self._comm_lock = threading.Lock()
+        self._port = None
+
+    @Pyro4.expose
+    def initialize(self):
+        """Connects to the device"""
+        if not pyro_client_matches(self._config.control_ips):
+            return CommandStatus.InvalidControlIP
+
+        with TryLock(self._command_lock) as success:
+            if not success:
+                return CommandStatus.Blocked
+
+            if self._port is not None:
+                return CommandStatus.NotDisconnected
+
+            port = None
+            try:
+                port = serial.Serial(self._config.serial_port,
+                                     self._config.serial_baud,
+                                     timeout=self._config.serial_timeout)
+
+                # Flush any stale state
+                port.flushInput()
+                port.flushOutput()
+
+                with self._comm_lock:
+                    self._port = port
+
+                    # Ping the controller to make sure it is connected
+                    if self._query_state() == CoversState.Disabled:
+                        port.close()
+                        return CommandStatus.Failed
+
+                log.info(self._config.log_name, 'Connected to covers')
+
+                return CommandStatus.Succeeded
+            except Exception as exception:
+                print(f'Failed to connect to serial port ({exception})')
+                if port:
+                    port.close()
+                return CommandStatus.Failed
+
+    @Pyro4.expose
+    def shutdown(self):
+        """Disconnects from the device"""
+        if not pyro_client_matches(self._config.control_ips):
+            return CommandStatus.InvalidControlIP
+
+        with TryLock(self._command_lock) as success:
+            if not success:
+                return CommandStatus.Blocked
+
+            if self._port is None:
+                return CommandStatus.NotConnected
+
+            log.info(self._config.log_name, 'Covers disconnected')
+            with self._comm_lock:
+                self._port.close()
+                self._port = None
+
+            return CommandStatus.Succeeded
+
+    def _query_state(self):
+        """Request and parse the status of the cover controller"""
+        if self._port is None:
+            return CoversState.Disabled
+
+        if self._port.write('?\n'.encode('ascii')) != 2:
+            raise serial.SerialException('Failed to send cover query command')
+
+        response = self._port.readline().decode('ascii').strip()
+        state = RESPONSE_STATUS.get(response, None)
+        if state is None:
+            print(f'Failed to parse status result: `{response}`')
+            self._port.close()
+            self._port = None
+            return CoversState.Disabled
+
+        return state
+
+    @Pyro4.expose
+    def report_status(self):
+        """Returns a dictionary containing the current focuser state"""
+        with self._comm_lock:
+            state = self._query_state()
+            return {
+                'date': Time.now().strftime('%Y-%m-%dT%H:%M:%SZ'),
+                'state': state
+            }
+
+    def _move_covers(self, request_open):
+        if not pyro_client_matches(self._config.control_ips):
+            return CommandStatus.InvalidControlIP
+
+        with TryLock(self._command_lock) as success:
+            if not success:
+                return CommandStatus.Blocked
+
+            if self._port is None:
+                return CommandStatus.NotConnected
+
+            if request_open:
+                desired_state = CoversState.Open
+                moving_state = CoversState.Opening
+            else:
+                desired_state = CoversState.Closed
+                moving_state = CoversState.Closing
+
+            state = self._query_state()
+            if state == desired_state:
+                return CommandStatus.Succeeded
+
+            with self._comm_lock:
+                if self._port.write(('O\n' if request_open else 'C\n').encode('ascii')) != 2:
+                    return CommandStatus.Failed
+                if self._port.readline().decode('ascii').strip() != '$':
+                    return CommandStatus.Failed
+
+            # Wait for the covers to start moving
+            time.sleep(2)
+            start_time = Time.now()
+            while True:
+                time.sleep(1)
+                if Time.now() - start_time > self._config.move_timeout * u.s:
+                    return CommandStatus.Failed
+
+                with self._comm_lock:
+                    state = self._query_state()
+                    if state == desired_state:
+                        return CommandStatus.Succeeded
+                    elif state != moving_state:
+                        return CommandStatus.Failed
+
+    @Pyro4.expose
+    def open_covers(self):
+        """Request the mirror covers to be in the open state"""
+        return self._move_covers(True)
+
+    @Pyro4.expose
+    def close_covers(self):
+        """Request the mirror covers to be in the closed state"""
+        return self._move_covers(False)
+
+    @Pyro4.expose
+    def stop_covers(self):
+        """Request the mirror covers to stop immediately"""
+        if not pyro_client_matches(self._config.control_ips):
+            return CommandStatus.InvalidControlIP
+
+        with self._comm_lock:
+            if self._port is None:
+                return CommandStatus.NotConnected
+
+            if self._port.write('S\n'.encode('ascii')) != 2:
+                return CommandStatus.Failed
+            if self._port.readline().decode('ascii').strip() != '$':
+                return CommandStatus.Failed
+        return CommandStatus.Succeeded
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Mirror Covers Server')
+    parser.add_argument('config', help='Path to configuration json file')
+    args = parser.parse_args()
+    _config = Config(args.config)
+    _config.daemon.launch(CoversDaemon(_config))

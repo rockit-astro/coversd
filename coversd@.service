@@ -1,0 +1,13 @@
+[Unit]
+Description=Daemon for controlling the W1m mirror covers
+After=syslog.target
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Restart=on-failure
+Type=simple
+ExecStart=/usr/bin/env python3 -u /usr/bin/coversd /etc/coversd/%i.json
+
+[Install]
+WantedBy=multi-user.target
