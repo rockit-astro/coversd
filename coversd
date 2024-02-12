@@ -133,7 +133,7 @@ class CoversDaemon:
                 'state': state
             }
 
-    def _move_covers(self, request_open):
+    def _move_covers(self, request_open, blocking):
         if not pyro_client_matches(self._config.control_ips):
             return CommandStatus.InvalidControlIP
 
@@ -161,6 +161,9 @@ class CoversDaemon:
                 if self._port.readline().decode('ascii').strip() != '$':
                     return CommandStatus.Failed
 
+            if not blocking:
+                return CommandStatus.Succeeded
+
             # Wait for the covers to start moving
             time.sleep(2)
             start_time = Time.now()
@@ -177,14 +180,14 @@ class CoversDaemon:
                         return CommandStatus.Failed
 
     @Pyro4.expose
-    def open_covers(self):
+    def open_covers(self, blocking=True):
         """Request the mirror covers to be in the open state"""
-        return self._move_covers(True)
+        return self._move_covers(True, blocking)
 
     @Pyro4.expose
-    def close_covers(self):
+    def close_covers(self, blocking=True):
         """Request the mirror covers to be in the closed state"""
-        return self._move_covers(False)
+        return self._move_covers(False, blocking)
 
     @Pyro4.expose
     def stop_covers(self):
