@@ -1,7 +1,7 @@
 {
   "daemon": "onemetre_covers",
   "log_name": "coversd@onemetre",
-  "control_machines": ["OneMetreDome", "OneMetreTCS"],
+  "control_machines": ["OneMetreDome", "OneMetreTCS", "OneMetreDAS"],
   "serial_port": "/dev/covers",
   "serial_baud": 9600,
   "serial_timeout": 5,
