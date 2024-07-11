@@ -16,8 +16,6 @@
 
 """Constants and status codes used by coversd"""
 
-from rockit.common import TFmt
-
 
 class CommandStatus:
     """Numeric return codes"""
@@ -62,13 +60,13 @@ class CoversState:
         5: 'CLOSING'
     }
 
-    _formats = {
-        0: TFmt.Bold + TFmt.Red,
-        1: TFmt.Bold + TFmt.Red,
-        2: TFmt.Bold + TFmt.Green,
-        3: TFmt.Bold + TFmt.Red,
-        4: TFmt.Bold + TFmt.Yellow,
-        5: TFmt.Bold + TFmt.Yellow,
+    _colors = {
+        0: 'red',
+        1: 'red',
+        2: 'green',
+        3: 'red',
+        4: 'yellow',
+        5: 'yellow'
     }
 
     @classmethod
@@ -77,9 +75,9 @@ class CoversState:
            Set formatting=true to enable terminal formatting characters
         """
         if formatting:
-            if status in cls._formats and status in cls._formats:
-                return cls._formats[status] + cls._labels[status] + TFmt.Clear
-            return TFmt.Red + TFmt.Bold + 'UNKNOWN' + TFmt.Clear
+            if status in cls._labels and status in cls._colors:
+                return f'[b][{cls._colors[status]}]{cls._labels[status]}[/{cls._colors[status]}][/b]'
+            return '[b][red]UNKNOWN[/red][/b]'
 
         if status in cls._labels:
             return cls._labels[status]

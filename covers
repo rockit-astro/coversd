@@ -21,6 +21,7 @@ import glob
 import os
 import sys
 import Pyro4
+from rockit.common import print
 from rockit.covers import Config, CommandStatus, CoversState
 
 
