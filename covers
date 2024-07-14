@@ -56,7 +56,7 @@ def run_command(command, args):
 
 
 def print_status(config, _):
-    """Prints a human-readable summary of the focuser status"""
+    """Prints a human-readable summary of the covers status"""
     with config.daemon.connect() as covers:
         data = covers.report_status()
 
@@ -76,7 +76,7 @@ def open_covers(config, _):
 
 
 def close_covers(config, _):
-    """Request covers to be open"""
+    """Request covers to be closed"""
     try:
         with config.daemon.connect(timeout=config.daemon.default_timeout + config.move_timeout) as covers:
             return covers.close_covers()
@@ -106,7 +106,7 @@ def shutdown(config, *_):
 
 def print_usage():
     """Prints the utility help"""
-    print(f'usage: {SCRIPT_NAME} <command> [<args>]')
+    print(f'usage: {SCRIPT_NAME} <command>')
     print()
     print('general commands:')
     print('   open         request the covers to be open')
