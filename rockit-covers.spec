@@ -25,7 +25,7 @@ mkdir -p %{buildroot}%{_udevrulesdir}
 %package server
 Summary:  Mirror covers control server.
 Group:    Unspecified
-Requires: python3-rockit-covers python3-pyserial
+Requires: python3-rockit-covers python3-pyserial python3-astropy
 %description server
 
 %files server
