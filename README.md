@@ -1,6 +1,6 @@
 ## W1m mirror covers daemon
 
-`coversd` interfaces with and wraps the [mirror cover conroller]().
+`coversd` interfaces with and wraps a microcontroller relay board (see controller directory) that drive the linear actuators.
 
 `covers` is a commandline utility for controlling the covers.
 

@@ -20,8 +20,6 @@ mkdir -p %{buildroot}%{_udevrulesdir}
 %{__install} %{_sourcedir}/coversd %{buildroot}%{_bindir}
 %{__install} %{_sourcedir}/coversd@.service %{buildroot}%{_unitdir}
 %{__install} %{_sourcedir}/completion/covers %{buildroot}/etc/bash_completion.d
-
-%{__install} %{_sourcedir}/10-onemetre-covers.rules %{buildroot}%{_udevrulesdir}
 %{__install} %{_sourcedir}/onemetre.json %{buildroot}%{_sysconfdir}/coversd/
 
 %package server
@@ -54,7 +52,6 @@ Group:   Unspecified
 
 %files data-onemetre
 %defattr(0644,root,root,-)
-%{_udevrulesdir}/10-onemetre-covers.rules
 %{_sysconfdir}/coversd/onemetre.json
 
 %changelog
