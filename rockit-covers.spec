@@ -1,6 +1,6 @@
 Name:      rockit-covers
 Version:   %{_version}
-Release:   1
+Release:   1%{dist}
 Summary:   W1m mirror covers.
 Url:       https://github.com/rockit-astro/coversd
 License:   GPL-3.0

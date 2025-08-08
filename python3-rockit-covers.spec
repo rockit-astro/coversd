@@ -1,6 +1,6 @@
 Name:           python3-rockit-covers
 Version:        %{_version}
-Release:        1
+Release:        1%{dist}
 License:        GPL3
 Summary:        Common backend code for the W1m mirror covers daemon
 Url:            https://github.com/rockit-astro/coversd
